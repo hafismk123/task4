@@ -1,0 +1,7 @@
+---
+phpmodules:
+        - php
+        - php-mysql
+        - php-pdo
+        - php-gd
+        - php-mbstring

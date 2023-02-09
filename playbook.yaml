@@ -1,0 +1,95 @@
+---
+ - name: LAMP Architecture
+   hosts: all
+   become: true
+   gather_facts: true
+   
+   vars:
+    username: Tom
+    rootpass: !vault |
+          $ANSIBLE_VAULT;1.2;AES256;rootpass
+          38313666393637383137663333616562363666363836333162623462653264646331653063323532
+          6564613036623637383232656566313964663266393265350a353733336630653736626264633962
+          39383631383535653063373931343831666133666537663830323531326534633437386162333737
+          3933366164323064300a663361306335386434393731333661346236353265646264333934643933
+          3838
+
+   vars_files:
+    - "{{ ansible_facts['distribution'] }}.yaml"
+    - phpmodules.yaml
+
+   tasks:
+    - name: Installing Apache Ubuntu
+      ansible.builtin.apt:
+        name: apache2
+        state: latest
+        update_cache: yes
+      when: ansible_facts['distribution']  == "Ubuntu"
+
+    - name: Installing httpd on CentOS
+      ansible.builtin.yum:
+        name: httpd
+        state: latest
+      when: ansible_facts['distribution'] == "CentOS"
+    
+    - name: Copy configuration file to CentOS
+      ansible.builtin.template:
+        src: templates/apache2.conf.j2
+        dest: "{{ config_dest }}/httpd.conf"
+      changed_when: true
+      when: ansible_facts['distribution'] == "CentOS"
+      notify: Restart Webserver
+
+    - name: Copying Index.php file
+      ansible.builtin.template:
+        src: templates/index.php.j2
+        dest: "{{ web_dest }}/index.php"
+  
+    - name: Installing MySQL on CentOS
+      ansible.builtin.yum:
+        name: mariadb-server
+        state: latest
+      when: ansible_facts['distribution'] == "CentOS"
+      changed_when: true
+      notify: Restart MySQL
+     
+    - name: flushing handlers
+      ansible.builtin.meta: flush_handlers
+
+    - name: Set mysql root password
+      ansible.builtin.command: "/usr/bin/mysqladmin -u root password {{ rootpass }}"
+      ignore_errors: true
+        
+    # Creating user Tim and .my.cnf file and login to my sql based on .my.cnf file
+    - name: Creating user Tim
+      ansible.builtin.user:
+       name: "{{ username }}"
+       shell: /bin/bash
+      
+    - name: copying the .my.cnf file
+      ansible.builtin.copy:
+        src: .my.cnf
+        dest: "/home/{{ username }}"
+        mode: 0600
+        owner: "{{ username }}"
+        group: "{{ username }}"
+
+    - name: Install PHP Modules
+      ansible.builtin.yum:
+        name: "{{ item }}"
+        state: latest
+      loop: "{{ phpmodules }}"
+
+   handlers:
+    - name: Restart Webserver
+      ansible.builtin.service:
+        name: httpd
+        state: restarted
+
+    - name: Restart MySQL
+      ansible.builtin.service:
+        name: mariadb
+        state: restarted
+
+
+   

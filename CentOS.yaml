@@ -1,0 +1,6 @@
+---
+admin_email: centos@localhost
+config_dest: /etc/httpd/conf.d/ 
+web_dest: /var/www/html/
+http_port: 80
+
